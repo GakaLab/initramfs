@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "Linux",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/usr/aarch64-linux-gnu/include"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/aarch64-linux-gnu-gcc",
+            "cStandard": "gnu23",
+            "cppStandard": "gnu++23",
+            "intelliSenseMode": "gcc-arm64",
+            "compilerArgs": [
+                "-mtune",
+                "cortex-a55",
+                "-march",
+                "armv8.2-a",
+                "-pipe",
+                "-O2",
+                "-fpic",
+                "-fpie",
+                "-static"
+            ],
+            "compileCommands": "",
+            "configurationProvider": "ms-vscode.makefile-tools"
+        }
+    ],
+    "version": 4
+}

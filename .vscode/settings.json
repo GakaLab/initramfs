@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "kdev_t.h": "c",
+        "stdio.h": "c",
+        "reboot.h": "c",
+        "stat.h": "c",
+        "unistd.h": "c",
+        "limits.h": "c",
+        "types.h": "c"
+    }
+}

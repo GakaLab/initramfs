@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+boot.img
+console
+ramdisk.cpio.gz
+initrd/
+logs/
+
