@@ -1,0 +1,32 @@
+/{
+    model = "mediatek,MT6769H";
+	compatible = <&model>, "mediatek,MT6768";
+    interrupt-parent = <0x1>;
+    #address-cells = <2>; // I know This formats reg input
+    #size-cells = <2>; // I know This formats reg input
+    serial-number = "";
+    chasis-type = "handset";
+
+    cpu{
+        #address-cells = <2>;
+        #size-cells = <2>;
+    };
+
+    memory {
+        device_type = "memory";
+        reg = <0x0 0x0 >;
+    };
+
+    reserved-memory {
+        #address-cells = <1>;
+        #size-cells = <1>;
+        mmmc_reserved: mmc@11230000 {
+            compatible = "acme,multimedia-memory";
+            reg = <0x11230000 0x4000000>;
+        };
+    };
+
+    mmc: mmc@11230000 {
+        memory-region = <&mmc_reserved>;
+    };
+};

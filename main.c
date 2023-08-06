@@ -4,12 +4,10 @@ int main(int argc, char *argv[])
 {
     setup_rootfs();
     populate_devices();
-    show_variables(argc, argv);
-    // mount_rootfs();
-    //  sleep(0XFFFFFF);
-    if (bootloader)
-        reboot_device(RB_KEXEC);
-    return 0;
+    mount_rootfs();
+    // list_files();
+    //  show_variables(argc, argv);
+    return sleep(0XFFFFFF);
 }
 
 static inline void setup_rootfs()
@@ -35,9 +33,25 @@ static inline void populate_devices()
     mknod("/dev/tty", S_IFCHR | DEFFILEMODE, MKDEV(5, 0));
     mknod("/dev/console", S_IFCHR | S_IRUSR | S_IWUSR | S_IWGRP, MKDEV(5, 1));
     mknod("/dev/ptmx", S_IFCHR | DEFFILEMODE, MKDEV(5, 2));
+    mknod("/dev/fb0", S_IFCHR | DEFFILEMODE, MKDEV(29, 0));
     mknod("/dev/block/mmcblk0", S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP, MKDEV(179, 1));
     mknod("/dev/block/mmcblk0p31", S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP, MKDEV(179, 31));
     mknod("/dev/block/mmcblk0p32", S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP, MKDEV(179, 32));
+}
+
+static inline void list_files(char *path)
+{
+    DIR *directory;
+    struct dirent *folder;
+    directory = opendir(path);
+    if (directory)
+    {
+        while ((folder = readdir(directory)) != NULL)
+        {
+            klog(folder->d_name);
+        }
+        closedir(directory);
+    }
 }
 
 static inline void klog(char *message)
@@ -60,10 +74,11 @@ static inline void show_error()
     klog(strerror(errno));
 }
 
-static inline void print_mounts()
+static inline void print_file(char *path)
 {
-    FILE *mounts = fopen("/proc/mounts", "r");
+    FILE *mounts = fopen(path, "r");
     char buffer[128];
+    klog(path);
     while (fgets(buffer, sizeof(buffer), mounts) != NULL)
     {
         klog(buffer);
@@ -76,10 +91,12 @@ static inline void mount_rootfs()
     if (mount(rootfs, "/mnt", "ext4", MS_RELATIME | MS_STRICTATIME, "") == 0)
     {
         klog("Mount Successful");
-        print_mounts();
+        print_file("/proc/mounts");
         FILE *log = fopen("/mnt/log.txt", "w");
+        list_files("/mnt");
         fprintf(log, "Some text");
         fclose(log);
+        reboot_device(RB_KEXEC);
     }
     else
         show_error();
@@ -97,7 +114,7 @@ static inline void show_variables(int count, char *argument[])
         {
             char buffer[strlen(parameter)];
             sprintf(buffer, "%s", parameter);
-            set_reason(buffer);
+            // set_reason(buffer);
             parameter = strtok(NULL, " ");
         }
     }
@@ -127,8 +144,8 @@ static inline int get_file_size(FILE *file)
 
 static inline void reboot_device(int command)
 {
-    if (umount(rootfs) != 0)
-        show_error();
+    if (mountpoint("/mnt"))
+        umount("/mnt");
     sync();
     switch (command)
     {
@@ -162,8 +179,22 @@ static inline void set_reason(char *parameter)
             else if (strcmp(token, "reboot_longkey") == 0)
                 reboot_device(RB_AUTOBOOT);
             else if (strcmp(token, "androidboot.bootreason") != 0)
+            {
                 klog(token);
+                reboot_device(RB_AUTOBOOT);
+            }
             token = strtok(NULL, " ");
         }
     }
+}
+
+static bool mountpoint(char *path)
+{
+    struct stat parent;
+    struct stat child;
+    char buffer[strlen(path) + 4];
+    sprintf(buffer, "%s/..", path);
+    stat(buffer, &parent);
+    stat(path, &child);
+    return parent.st_dev == child.st_dev;
 }

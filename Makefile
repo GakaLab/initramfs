@@ -30,7 +30,7 @@ boot.img: ramdisk
 flash:
 	adb -d wait-for-usb-device reboot bootloader
 	fastboot flash boot_a boot.img
-	fastboot continue
+	fastboot reboot
 	sleep 20
 	fastboot flash boot_a stock.img
 	fastboot continue
