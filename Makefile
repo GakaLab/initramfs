@@ -19,7 +19,7 @@ ramdisk: init
 boot.img: ramdisk
 	mkbootimg --header_version 2 \
         --os_version 13.0.0 --os_patch_level 2023-01 \
-		--kernel kernel --ramdisk ramdisk.cpio.gz --dtb dtb \
+		--kernel Image.gz --ramdisk ramdisk.cpio.gz --dtb dtb \
 		--pagesize 0x00000800 --base 0x00000000 \
 		--kernel_offset 0x40080000 --ramdisk_offset 0x47c80000 \
 		--second_offset 0x00000000 --tags_offset 0x4bc80000 \
