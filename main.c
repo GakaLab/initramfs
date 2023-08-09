@@ -7,6 +7,7 @@ int main(int argc, char *argv[])
     mount_rootfs();
     // list_files();
     //  show_variables(argc, argv);
+    reboot_device(RB_KEXEC);
     return sleep(0XFFFFFF);
 }
 
@@ -62,14 +63,14 @@ static inline void klog(char *message)
     printf("%s\n", buffer);
     int kmsg = open("/dev/kmsg", O_WRONLY);
     if (write(kmsg, buffer, size) == -1)
-        show_error();
+        show_error("Write Error");
     close(kmsg);
 }
 
-static inline void show_error()
+static inline void show_error(char *target)
 {
-    char message[18 + strlen(strerror(errno))];
-    sprintf(message, "DEBUG MESSAGE: %s\n", strerror(errno));
+    char message[20 + strlen(target) + strlen(strerror(errno))];
+    sprintf(message, "DEBUG MESSAGE: %s %s\n", target, strerror(errno));
     printf("%s\n", message);
     klog(strerror(errno));
 }
@@ -99,7 +100,7 @@ static inline void mount_rootfs()
         reboot_device(RB_KEXEC);
     }
     else
-        show_error();
+        show_error("Mount ROOTFS");
 }
 
 static inline void show_variables(int count, char *argument[])

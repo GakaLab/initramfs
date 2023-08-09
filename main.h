@@ -28,7 +28,7 @@ static inline void setup_rootfs();
 static inline void populate_devices();
 static inline void list_files(char *path);
 static inline void klog(char *message);
-static inline void show_error();
+static inline void show_error(char *target);
 static inline void show_variables(int count, char *argument[]);
 static inline void mount_rootfs();
 static inline void print_file(char *path);
