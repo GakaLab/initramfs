@@ -46,29 +46,52 @@ void sig_handler(int sig)
     }
 }
 
+
+void* power_on_thread(void* arg)
+{
+    int cid = *(int*)arg;
+    int retry = 20;
+
+    pthread_setname_np(pthread_self(), "pwr_on_conn");
+
+    while (retry-- > 0)
+    {
+        if (ioctl(g_wmt_fd, WMT_IOCTL_LPBK_POWER_CTRL, 1) == 0)
+        {
+            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Power on successful for 0x%x", cid);
+            return NULL;
+        }
+        ioctl(g_wmt_fd, WMT_IOCTL_LPBK_POWER_CTRL, 0);  // Reset
+        usleep(1000000);                                // 1s
+    }
+    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Power on failed after retries");
+    return NULL;
+}
+
+int handle_command(char* cmd)
+{
+    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Command received: %s", cmd);
+
+    char resp[256] = "ok";
+    if (strstr(cmd, "srh_patch"))
+    {
+        // Implement specific patch searching logic based on Chip ID
+        // This usually involves opendir("/vendor/firmware") and string matching
+        snprintf(resp, sizeof(resp), "ok");
+    }
+    else
+    {
+        snprintf(resp, sizeof(resp), "cmd not found");
+    }
+
+    write(g_wmt_fd, resp, strlen(resp));
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
-    int ret;
-
-    /* 2. Open STP WMT device */
-    g_wmt_fd = open(WMT_DEV_NODE, O_RDWR);
-    while (g_wmt_fd < 0)
-    {
-        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Cannot open %s: %s", WMT_DEV_NODE,
-                            strerror(errno));
-        usleep(300000);
-        g_wmt_fd = open(WMT_DEV_NODE, O_RDWR);
-    }
-
-    /* 3. Retrieve Chip ID */
-    if (__system_property_get("persist.vendor.connsys.chipid", prop_buf) > 0)
-    {
-        g_chip_id = (int)strtoul(prop_buf, NULL, 16);
-    }
-
-    if (g_chip_id <= 0)
-    {
-        g_chip_id = ioctl(g_wmt_fd, WMT_IOCTL_GET_DRV_CHIPID, 0);
+    int stpwmt = open(/dev/stpwmt, O_RDWR);
+    int chipid = ioctl(stpwmt, WMT_IOCTL_GET_DRV_CHIPID, 0);
     }
 
     __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Launcher starting for ChipID: 0x%04x",
@@ -118,46 +141,5 @@ int main(int argc, char** argv)
     }
 
     if (g_wmt_fd >= 0) close(g_wmt_fd);
-    return 0;
-}
-
-void* power_on_thread(void* arg)
-{
-    int cid = *(int*)arg;
-    int retry = 20;
-
-    pthread_setname_np(pthread_self(), "pwr_on_conn");
-
-    while (retry-- > 0)
-    {
-        if (ioctl(g_wmt_fd, WMT_IOCTL_LPBK_POWER_CTRL, 1) == 0)
-        {
-            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Power on successful for 0x%x", cid);
-            return NULL;
-        }
-        ioctl(g_wmt_fd, WMT_IOCTL_LPBK_POWER_CTRL, 0);  // Reset
-        usleep(1000000);                                // 1s
-    }
-    __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Power on failed after retries");
-    return NULL;
-}
-
-int handle_command(char* cmd)
-{
-    __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, "Command received: %s", cmd);
-
-    char resp[256] = "ok";
-    if (strstr(cmd, "srh_patch"))
-    {
-        // Implement specific patch searching logic based on Chip ID
-        // This usually involves opendir("/vendor/firmware") and string matching
-        snprintf(resp, sizeof(resp), "ok");
-    }
-    else
-    {
-        snprintf(resp, sizeof(resp), "cmd not found");
-    }
-
-    write(g_wmt_fd, resp, strlen(resp));
     return 0;
 }
