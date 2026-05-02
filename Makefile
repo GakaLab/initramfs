@@ -1,45 +1,77 @@
-CC := aarch64-linux-gnu-gcc
-CFLAGS := -mtune=cortex-a55 -march=armv8.2-a -pipe -O2 -fpic -fpie -std=gnu17 
-OUTPUT := initrd
+TARGET	:= 0e8d:201c
+DEVICE	:= /dev/ttyACM0
+CMDLINE := 'root=/dev/mmcblk0p28 init=/sbin/init'
 
-
-.PHONY: init ramdisk boot.img test
+.PHONY: busybox.img
 
 all: boot.img
 
-init:
-	clear
-	[ -d $@rd ] || mkdir $@rd
-	${CC} ${CFLAGS} -static main.c -o ${OUTPUT}/$@
-	chmod 777 ${OUTPUT}/$@
+init: src/main.c
+	aarch64-linux-gnu-gcc -static -o initrd/$@ $<
+	aarch64-linux-gnu-strip --strip-unneeded initrd/$@
 
-ramdisk: init
-	cd initrd && echo init | cpio -o --format=newc -R root:root | gzip -9 > ../ramdisk.cpio.gz
+login: src/login.c
+	aarch64-linux-gnu-gcc -static -o initrd/bin/$@ $<
+	aarch64-linux-gnu-strip --strip-unneeded initrd/bin/$@
+
+wmt_manager: src/wmt_manager.c
+	aarch64-linux-gnu-gcc -static -o initrd/bin/$@ $<
+	aarch64-linux-gnu-strip --strip-unneeded initrd/bin/$@
+
+wmt_loader: src/wmt_loader.c
+	aarch64-linux-gnu-gcc -o initrd/bin/$@ $<
+	aarch64-linux-gnu-strip --strip-unneeded initrd/bin/$@
+
+rescue: src/rescue.c
+	aarch64-linux-gnu-gcc -static -o initrd/sbin/$@ $<
+	aarch64-linux-gnu-strip --strip-unneeded initrd/sbin/$@
+
+ramdisk: login rescue wmt_manager wmt_loader
+	python script.py -r -i initrd -o ramdisk.cpio.gz
+
+#boot.img: ramdisk
+#	mkbootimg --os_patch_level 2022-01 \
+#	   --header_version 2 --os_version 10.0.0 \
+#	   --kernel Image.gz --ramdisk ramdisk.cpio.gz \
+#	   --recovery_dtbo dtbo.img --dtb mt6765.dtb \
+#	   --pagesize 0x800 --base 0x40000000 --kernel_offset 0x80000 \
+#	   --ramdisk_offset 0x11B00000 --second_offset 0xf00000 \
+#	   --tags_offset 0x7880000 --dtb_offset 0x7880000 \
+#	   --cmdline 'bootopt=64S3,32N2,64N2 buildvariant=user' \
+#	   --board CY-KD7-H6211-F --output boot.img
 
 boot.img: ramdisk
 	mkbootimg --header_version 2 \
-        --os_version 13.0.0 --os_patch_level 2023-01 \
-		--kernel Image.gz --ramdisk ramdisk.cpio.gz --dtb dtb \
-		--pagesize 0x00000800 --base 0x00000000 \
-		--kernel_offset 0x40080000 --ramdisk_offset 0x47c80000 \
-		--second_offset 0x00000000 --tags_offset 0x4bc80000 \
-		--dtb_offset 0x000000004bc80000 --board CY-KI7-V7510 \
-		--cmdline 'bootopt=64S3,32N2,64N2 loglevel=7 printk.devkmsg=on \
-		    androidboot.selinux=permissive buildvariant=eng' -o $@
+		--os_version 10.0.0 \
+		--os_patch_level 2022-01 \
+		--kernel Image.gz \
+		--ramdisk ramdisk.cpio.gz \
+		--dtb mt6765.dtb \
+		--pagesize 0x800 \
+		--base 0x40000000 \
+		--kernel_offset 0x80000 \
+		--ramdisk_offset 0x11B00000 \
+		--tags_offset 0x7880000 \
+		--dtb_offset 0x7880000 \
+		--board CY-KD7-H6211-F \
+		--cmdline 'bootopt=64S3,32N2,64N2 buildvariant=user' \
+		-o boot.img
 
-flash:
-	adb -d wait-for-usb-device reboot bootloader
-	fastboot flash boot_a boot.img
-	fastboot reboot
-	sleep 20
-	fastboot flash boot_a stock.img
-	fastboot continue
-	adb -d wait-for-usb-device shell su -c cat /sys/fs/pstore/console-ramoops-0 > console
+flash: boot.img
+	@if adb get-state 1>/dev/null 2>&1; then \
+	   echo "rescueing to bootloader..."; \
+	   adb rescue bootloader; \
+	fi
+	fastboot flash recovery boot.img
+	fastboot reboot recovery
+	while true; do \
+	    if lsusb | grep -q "$(TARGET)" && [ -e "$(DEVICE)" ]; then break; fi; \
+	    if lsusb | grep -q "$(TARGET)" && [ -e "/dev/android_fastboot" ]; then exit; fi; \
+	    sleep 1; \
+	done
+	stty rows 34 cols 162 < "$(DEVICE)"
+	screen "$(DEVICE)" 115200
 
-metamode:
-	mtk payload --metamode FASTBOOT
-
-test: init
-	adb push initrd/init /data/local/tmp/init
-	adb shell su -c mv /data/local/tmp/init /data/local/tmp/root/init
-	adb shell su -c chroot /data/local/tmp/root /init
+shell:
+	stty rows 34 cols 162 < "$(DEVICE)"
+	screen "$(DEVICE)" 115200
