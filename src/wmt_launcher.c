@@ -94,8 +94,7 @@ int main(int argc, char** argv)
     int chipid = ioctl(stpwmt, WMT_IOCTL_GET_DRV_CHIPID, 0);
     }
 
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Launcher starting for ChipID: 0x%04x",
-                        g_chip_id);
+    printf("Launcher starting for ChipID: 0x%04x", chipid);
 
     /* 4. Setup Signal Handlers */
     struct sigaction sa;
@@ -107,7 +106,7 @@ int main(int argc, char** argv)
 
     /* 5. Start Power-On Thread */
     pthread_t pwr_thread;
-    if (pthread_create(&pwr_thread, NULL, power_on_thread, &g_chip_id) != 0)
+    if (pthread_create(&pwr_thread, NULL, power_on_thread, &chipid) != 0)
     {
         __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Failed to create power thread");
     }
