@@ -14,7 +14,6 @@
 
 #define LOG_TAG "wmt_launcher"
 #define WMT_DEV_NODE "/dev/stpwmt"
-#define CFG_FILE_PATH "/system/vendor/firmware/WMT.cfg"
 
 /* IOCTL Commands */
 #define WMT_IOCTL_GET_CHIPID          0x8004A00C
@@ -49,9 +48,7 @@ int main(int argc, char **argv) {
     char prop_buf[256];
     int ret;
 
-    /* 1. Wait for driver to be ready */
     while (1) {
-        /* Replaced system_property_get with an environment variable or file read fallback */
         char *driver_ready = getenv("VENDOR_CONNSYS_DRIVER_READY");
         if (driver_ready && strcmp(driver_ready, "yes") == 0) {
             break;
@@ -59,7 +56,6 @@ int main(int argc, char **argv) {
         usleep(300000);
     }
 
-    /* 2. Open WMT device node */
     g_wmt_fd = open(WMT_DEV_NODE, O_RDWR);
     while (g_wmt_fd < 0) {
         printf("[%s] Cannot open %s: %s\n", LOG_TAG, WMT_DEV_NODE, strerror(errno));
@@ -67,7 +63,6 @@ int main(int argc, char **argv) {
         g_wmt_fd = open(WMT_DEV_NODE, O_RDWR);
     }
 
-    /* 3. Retrieve Chip ID */
     char *chip_env = getenv("PERSIST_VENDOR_CONNSYS_CHIPID");
     if (chip_env) {
         g_chip_id = (int)strtoul(chip_env, NULL, 16);
@@ -79,7 +74,6 @@ int main(int argc, char **argv) {
 
     printf("[%s] Launcher starting for ChipID: 0x%04x\n", LOG_TAG, g_chip_id);
 
-    /* 4. Signal Handling */
     struct sigaction sa;
     sa.sa_handler = sig_handler;
     sigemptyset(&sa.sa_mask);
@@ -87,7 +81,6 @@ int main(int argc, char **argv) {
     sigaction(SIGTERM, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
 
-    /* 5. Power On Thread */
     pthread_t pwr_thread;
     if (pthread_create(&pwr_thread, NULL, power_on_thread, &g_chip_id) != 0) {
         printf("[%s] Failed to create power thread\n", LOG_TAG);
@@ -95,7 +88,6 @@ int main(int argc, char **argv) {
         pthread_detach(pwr_thread);
     }
 
-    /* 6. Poll for Commands */
     struct pollfd fds[1];
     fds[0].fd = g_wmt_fd;
     fds[0].events = POLLIN;
@@ -122,7 +114,6 @@ void *power_on_thread(void *arg) {
     int cid = *(int *)arg;
     int retry = 20;
     
-    /* Set thread name */
     pthread_setname_np(pthread_self(), "pwr_on_conn");
     
     while (retry-- > 0) {
@@ -199,6 +190,8 @@ int cmd_hdr_sch_rom_patch(unsigned int chip_id) {
     DIR *dir;
     struct dirent *ent;
     char search_path[256] = "/vendor/firmware";
+    
+    printf("[%s] Searching ROM patches for Chip ID: mt%04x\n", LOG_TAG, chip_id);
 
     dir = opendir(search_path);
     if (dir == NULL) return -1;
@@ -207,7 +200,11 @@ int cmd_hdr_sch_rom_patch(unsigned int chip_id) {
         if (strstr(ent->d_name, "patch") != NULL) {
             char full_path[512];
             snprintf(full_path, sizeof(full_path), "%s/%s", search_path, ent->d_name);
-            printf("[%s] ROM Patch candidate: %s\n", LOG_TAG, ent->d_name);
+            
+            printf("[%s] ROM Patch found: %s\n", LOG_TAG, ent->d_name);
+            
+            // Send ROM patch information to the kernel
+            ioctl(g_wmt_fd, WMT_IOCTL_SET_ROM_PATCH_INFO, full_path);
         }
     }
     closedir(dir);
@@ -215,6 +212,5 @@ int cmd_hdr_sch_rom_patch(unsigned int chip_id) {
 }
 
 void launcher_set_prop(const char *key, const char *val) {
-    /* Set environment variable as an alternative to property_set */
     setenv(key, val, 1);
 }
